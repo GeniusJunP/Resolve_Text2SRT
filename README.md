@@ -1,18 +1,13 @@
-# textp2srt (macOS)
+# textp2srt
 
 **Mixed subtitle export helper for DaVinci Resolve**
-Plain Text clips + Text+ clips → one SRT file.
-
-## What it solves
-
-* Resolve API can read **Text+** but **not plain Text**.
-* This tool bridges the gap by combining:
-
-  * Clipboard watcher (for plain Text)
-  * Resolve API (for Text+)
+Plain Text clips + Text+ clips → one SRT file.  
+  
+Resolve API can read **Text+** but **not plain Text**.
+This tool bridges the gap by Clipboard watcher (for plain Text)
 
 This tool is based on the original **TextPlus2SRT** by [david-ca6](https://github.com/david-ca6).  
-Many thanks for the original implementation and inspiration!
+thanks for the original implementation and inspiration!
 
 ---
 
@@ -23,23 +18,7 @@ While Resolve is open:
 ```bash
 pip install typer
 ```
-
----
-
-## Manual file format
-
-Plain Text clips must be harvested manually via clipboard.
-Each captured block begins with `>`:
-
-```
->Hello world
->Second line
->Multi line block
-Line 2
-```
-
----
-
+  
 ## Commands
 
 Run `--help` for full options.
@@ -60,7 +39,17 @@ Extra options:
 * `--extra-ignore PATTERN`
 * `--no-ignore-effects`
 
----
+## Manual file format
+
+Plain Text clips must be harvested manually via clipboard.
+Each captured block begins with `>`:
+
+```
+>Hello world
+>Second line
+>Multi line block
+Line 2
+```
 
 ## Typical workflow
 
@@ -80,6 +69,7 @@ Extra options:
      * Select it, Cmd+A → Cmd+C (text copied)
      * Watcher adds new `>` block
    * Text+ clips are read automatically later.
+
 3. Preview & diagnose
 
    ```bash
@@ -92,14 +82,15 @@ Extra options:
    python src/textp2srt.py srt manual.txt subs.srt V4 --include-text-plus
    ```
 
----
-
 ## Tips
 
-* First clipboard snapshot is ignored (often stale).
-* Wrong block? → just edit `manual.txt`.
-* Filtering: common transitions + very short text ignored by default.
+* More blocks than clips → stray `>` or over-filtering
+* More clips than blocks → merge / add blocks / update ignore patterns
+  * These issues can be resolved by simply exporting the current blocks, placing them on the timeline, and checking the differences.
 
+* First clipboard snapshot is ignored (often stale).
+* Missing Text+ → forgot `--include-text-plus`
+* Filtering: common transitions + very short text ignored by default.
   * Disable with `--no-ignore-effects`.
   * Add patterns with `--extra-ignore`.
 
@@ -151,17 +142,6 @@ Show Resolve’s Python sys.path:
 ```bash
 "/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Libraries/Fusion/fuscript" -l python3 -c "import sys;print(*sys.path,sep='\n')"
 ```
-
----
-
-## Troubleshooting
-
-* More blocks than clips → stray `>` or over-filtering
-* More clips than blocks → merge / add blocks / update ignore patterns
-  * These issues can be resolved by simply exporting the current blocks, placing them on the timeline, and checking the differences.
-* Missing Text+ → forgot `--include-text-plus`
-
----
 
 ## License
 
