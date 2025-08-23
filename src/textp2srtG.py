@@ -37,7 +37,7 @@ try:
     import DaVinciResolveScript as dvr_script
 except ImportError:
     try:
-        expectedPath = "/opt/resolve/Developer/Scripting/Modules/"
+        expectedPath = "/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting/Modules/"
         load_source('DaVinciResolveScript', expectedPath + "DaVinciResolveScript.py")
         import DaVinciResolveScript as dvr_script
     except Exception as ex:
