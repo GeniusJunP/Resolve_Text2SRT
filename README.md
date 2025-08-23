@@ -1,63 +1,164 @@
-# TextPlus2SRT (tp2srt) - macOS Fork
-TextPlus2SRT (tp2srt) is a Python script that allows you to export Text+ from a DaVinci Resolve track to a .srt file, and update the timeline with text from a .srt file.  
-It uses the DaVinci Resolve API, pandas libraries and typer libraries.
+# textp2srt – Manual + Text/Text+ Mixed Subtitle Workflow (macOS)
 
-## macOS Compatibility
-This fork includes fixes for macOS compatibility:
-- Updated DaVinciResolveScript module path for macOS installations
-- Path changed from `/opt/resolve/Developer/Scripting/Modules/` to `/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting/Modules/`
-- Both CLI and GUI versions are now compatible with macOS
+This fork evolves the original TextPlus-only exporter into a lightweight CLI that lets you:
 
-## Use case
-- Export text from a DaVinci Resolve track to a .srt file to upload to a video hosting platform (YouTube) for accessibility.
-- Easier translation of subtitles. It's easier to translate a .srt file than to go through all the Text+ item on a track.
-- Export .srt file for backup. It's nice to have a .srt file in case something happens to the project files.
+* Capture / write manual subtitle blocks for plain "Text" title clips (which the Resolve API cannot read directly).
+* Automatically pull StyledText from Text+ (Fusion) clips.
+* Combine both into a single SRT with correct timing.
+* Diagnose mismatches, count usable clips, and apply manual text back into Text+ clips if desired.
 
-## Requirements
-Youneed to have the pandas and typer libraries installed.  
-You can install them using pip:
-```
-pip install pandas typer
-```
+All user‑facing output is English. The ignore list for transitions still contains Japanese names so filtering works on Japanese installs.
 
-## Usage
+---
 
-### CLI
-To use TextPlus2SRT, you need to have DaVinci Resolve installed and running. 
+## Why this approach?
+DaVinci Resolve's scripting API exposes the text content of Text+ (Fusion) clips, but NOT the content of simple "Text" title clips. To still build subtitles quickly:
 
-Once you have the necessary dependencies, you can run the script from the command line. There are three commands available:
+1. You maintain a manual subtitle text file where each block starts with a leading `>` line.
+2. Plain Text clips consume blocks sequentially.
+3. Text+ clips use their API text (manual blocks are NOT consumed for those unless the API returns empty).
+4. A mixed SRT is generated in timeline order.
 
-1. `export`: This command exports text from a specified track in the timeline to a .srt file. You need to provide the path to the .srt file and the name of the track.  
-    For example to export the track named "EN" to the file "test.srt" you can do:
-    ```
-    python textp2srt.py export test.srt EN
-    ```
+Result: You can freely mix Text and Text+ on a track and still export a coherent SRT without retyping Text+ content manually.
 
-2. `update`: This command updates the text in a specified track in the timeline with the text from a .srt file. You need to provide the path to the .srt file and the name of the track.
-    For example to update the track named "EN" with the text from the file "test.srt" you can do:
-    ```
-    python textp2srt.py update test.srt EN
-    ```
+---
 
-3. `render`: This command updates the text in a specified track in the timeline with the text from a .srt file, and then starts rendering the project. You need to provide the path to the .srt file and the name of the track.
-    For example to update the track named "EN" with the text from the file "test.srt", then render the project, you can do:
-    ```
-    python textp2srt.py render test.srt EN
-    ```
+## Installation
+Requires: Python 3 (tested 3.13), DaVinci Resolve (running), Typer.
 
-The script is designed to be used in a command line environment, but it can also be integrated into other Python scripts or applications.
-
-### GUI
-
-The GUI version is a simple application that allows you to export text from a DaVinci Resolve track to a .srt file, and update the timeline with text from a .srt file.
-
-To run the GUI version, you need to have the necessary dependencies installed. You can install them using pip:
-```
-pip install pandas typer dearpygui
+```bash
+pip install typer
 ```
 
-Then you can run the script from the command line:
+Place `textp2srt.py` in your project (or keep this repo) and run it while Resolve is open.
+
+---
+
+## Manual subtitle file format
+
 ```
-python textp2srtG.py
+>First subtitle line
+Optional continuation line
+>Second block
+>Third block line1
+Line2
 ```
+
+Rules:
+* A line beginning with `>` starts a new block (the `>` is removed; leading spaces after it are trimmed).
+* Lines until the next `>` (or EOF) belong to that block.
+* Empty blocks are discarded.
+
+---
+
+## Typical usage scenarios
+
+1. Rapid drafting while editing
+    * Keep a text editor beside Resolve.
+    * Use the clipboard watcher to append `>` blocks each time you copy a new subtitle line.
+    * Later run `preview` to verify alignment, then `srt` to export.
+
+2. Mixing Text and Text+
+    * Use Text+ for stylized lines you want to author directly inside Fusion.
+    * Use simple Text for the rest; just supply manual blocks for those.
+    * `srt --include-text-plus` merges both sources seamlessly.
+
+3. Cleaning transition noise
+    * Transitions / dips / dissolves often appear as short “clips”.
+    * Built‑in filtering ignores known names and very short generic segments.
+    * Add more patterns with `--extra-ignore` or disable filtering with `--no-ignore-effects`.
+
+4. Quality assurance pass
+    * Run `diagnose` to see kept vs ignored items and confirm counts.
+    * Run `stats` to quantify how many were ignored as effects vs Text+.
+
+5. Applying manual text back to Text+
+    * If you drafted all text manually first, later `apply` can push blocks into sequential Text+ clips (StyledText field).
+
+---
+
+## Commands overview
+
+Run `python src/textp2srt.py --help` for the live help.
+
+| Command | Purpose |
+|---------|---------|
+| `tracks` | List video track names (use to find your subtitle track name). |
+| `watch OUTPUT.txt` | Monitor clipboard; each new distinct clipboard snapshot is appended as a `>` block (first snapshot is skipped to avoid junk). |
+| `count TRACK` | Count subtitle candidate clips (plain Text by default; add `--include-text-plus` for Text+). |
+| `preview manual.txt TRACK` | Show first 30 (or all with `--all`) manual blocks paired with clip timings. |
+| `srt manual.txt out.srt TRACK --include-text-plus` | Generate mixed SRT (manual blocks + Text+ API text). Without the flag you only map manual blocks to plain Text clips. |
+| `diagnose manual.txt TRACK` | Show counts and (optionally with `--all`) full lists of kept / ignored / Text+. Hints for mismatches. |
+| `stats TRACK` | Summarize raw vs kept vs ignored vs Text+ counts + tail samples. |
+| `apply manual.txt TRACK` | Push manual blocks sequentially into Text+ clips' StyledText. |
+
+Shared options:
+* `--include-text-plus` – Include Text+ clips in clip collection (for `preview`, `srt`, `diagnose`).
+* `--no-ignore-effects` – Turn OFF effect/transition filtering.
+* `--extra-ignore PATTERN` – Additional substring(s) to treat as effects (repeatable).
+* `--all` – For `preview` / `diagnose` to show all entries.
+
+---
+
+## Example workflow
+
+1. Identify track: `python src/textp2srt.py tracks` → suppose it prints `V4` as your subtitle track name.
+2. Start recording manual lines while editing:
+    ```bash
+    python src/textp2srt.py watch manual.txt
+    ```
+    Copy each subtitle sentence; watcher appends blocks automatically.
+3. Inspect pairing:
+    ```bash
+    python src/textp2srt.py preview manual.txt V4 --include-text-plus
+    ```
+4. If counts differ, run diagnostics:
+    ```bash
+    python src/textp2srt.py diagnose manual.txt V4 --include-text-plus --all
+    ```
+    Adjust your manual file (merge/split blocks) or tweak ignore patterns.
+5. Export SRT:
+    ```bash
+    python src/textp2srt.py srt manual.txt subtitles.srt V4 --include-text-plus
+    ```
+6. (Optional) Push manual text into Text+ clips (if you created them blank first):
+    ```bash
+    python src/textp2srt.py apply manual.txt V4
+    ```
+
+---
+
+## Notes on filtering
+* Default ignore names include common Japanese & English transition terms.
+* A heuristic also ignores very short (≤0.6s) generic‑named segments (likely transition remnants).
+* Disable all filtering with `--no-ignore-effects` if you suspect over‑filtering.
+
+---
+
+## Limitations
+* Cannot read the text of plain Text (non‑Fusion) title clips via API – hence the manual workflow.
+* Assumes chronological ordering: blocks map to clips in timeline order. Re‑timing after generating an SRT may desync; regenerate after edits.
+* No multi‑line styling export (SRT is plain text). Text+ rich formatting is not preserved.
+
+---
+
+## Troubleshooting
+| Issue | Hint |
+|-------|------|
+| Blocks > clips | Extra stray `>` lines or over‑filtering. Try removing blank blocks or add `--no-ignore-effects`. |
+| Clips > blocks | Merge short manual blocks or add more `>` blocks; or add more `--extra-ignore` patterns. |
+| Missing Text+ lines | Ensure `--include-text-plus` was used for mixed export. |
+| No module `DaVinciResolveScript` | Make sure Resolve is installed and running; macOS path is auto‑handled. |
+| Typer not found | `pip install typer`. |
+
+---
+
+## License
+See `LICENSE` (inherits the original project’s license terms).
+
+---
+
+## Original project credit
+Based on the original TextPlus2SRT concept; refactored for a mixed manual/Text+ workflow and simplified dependencies (Typer only).
+
 
