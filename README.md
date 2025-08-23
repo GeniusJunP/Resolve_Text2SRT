@@ -1,6 +1,12 @@
-# TextPlus2SRT (tp2srt)
+# TextPlus2SRT (tp2srt) - macOS Fork
 TextPlus2SRT (tp2srt) is a Python script that allows you to export Text+ from a DaVinci Resolve track to a .srt file, and update the timeline with text from a .srt file.  
 It uses the DaVinci Resolve API, pandas libraries and typer libraries.
+
+## macOS Compatibility
+This fork includes fixes for macOS compatibility:
+- Updated DaVinciResolveScript module path for macOS installations
+- Path changed from `/opt/resolve/Developer/Scripting/Modules/` to `/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting/Modules/`
+- Both CLI and GUI versions are now compatible with macOS
 
 ## Use case
 - Export text from a DaVinci Resolve track to a .srt file to upload to a video hosting platform (YouTube) for accessibility.
