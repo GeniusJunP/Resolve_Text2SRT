@@ -1,20 +1,36 @@
-## textp2srt (macOS)
+# textp2srt (macOS)
 
-Mixed subtitle export helper for DaVinci Resolve. Plain Text clips + Text+ clips -> one SRT.
+**Mixed subtitle export helper for DaVinci Resolve**
+Plain Text clips + Text+ clips → one SRT file.
 
-Core idea:
-* Resolve API can read Text+ but not simple Text.
-* You keep a manual file. Each block starts with `>`.
-* Plain Text clips consume blocks in order.
-* Text+ clips use their own StyledText.
-* Export a mixed SRT in timeline order.
+## What it solves
 
-Install (while Resolve is open):
-```
+* Resolve API can read **Text+** but **not plain Text**.
+* This tool bridges the gap by combining:
+
+  * Clipboard watcher (for plain Text)
+  * Resolve API (for Text+)
+
+This tool is based on the original **TextPlus2SRT** by [david-ca6](https://github.com/david-ca6).  
+Many thanks for the original implementation and inspiration!
+
+---
+
+## Install
+
+While Resolve is open:
+
+```bash
 pip install typer
 ```
 
-Manual file example:
+---
+
+## Manual file format
+
+Plain Text clips must be harvested manually via clipboard.
+Each captured block begins with `>`:
+
 ```
 >Hello world
 >Second line
@@ -22,7 +38,12 @@ Manual file example:
 Line 2
 ```
 
-Main commands (run `--help` for options):
+---
+
+## Commands
+
+Run `--help` for full options.
+
 ```
 tracks                              # list video track names
 watch manual.txt                    # clipboard -> >blocks (skips first snapshot)
@@ -33,82 +54,115 @@ diagnose manual.txt TRACK [--include-text-plus] [--all]
 stats TRACK
 apply manual.txt TRACK              # write blocks into Text+ clips
 ```
-Options you might add: `--extra-ignore PATTERN`, `--no-ignore-effects`.
 
-### Practical use of `watch`
-Goal: harvest existing plain Text (title) clips so you don't retype them.
+Extra options:
 
-Flow:
-1. Start watcher in terminal:
-	```
-	python src/textp2srt.py watch manual.txt
-	```
-2. Switch to Resolve. For each plain Text clip (NOT Text+):
-	* Click the clip.
-	* In the Inspector select the text field, press Cmd+A (Ctrl+A on Windows) then Cmd+C (Ctrl+C).
-	* The clipboard change is auto‑captured as a new `>` block.
-3. Skip any Text+ clips (their text is read via API later).
-4. When done, Ctrl+C the watcher. Now `manual.txt` has blocks matching your plain Text clips in timeline order.
-5. Run `preview` / `diagnose` and then `srt` with `--include-text-plus` for the mixed export.
+* `--extra-ignore PATTERN`
+* `--no-ignore-effects`
 
-Tips:
-* First clipboard snapshot is ignored on purpose (often stale content).
-* If you copied something wrong just edit `manual.txt` directly.
+---
 
-Typical quick flow:
-1. Find track: `python src/textp2srt.py tracks`
-2. Capture lines while editing: `python src/textp2srt.py watch manual.txt`
-3. Preview: `python src/textp2srt.py preview manual.txt V4 --include-text-plus`
-4. Fix mismatches if counts differ (`diagnose`, edit manual file)
-5. Export: `python src/textp2srt.py srt manual.txt subs.srt V4 --include-text-plus`
+## Typical workflow
 
-Filtering: common transition names + very short generic clips ignored. Turn off with `--no-ignore-effects`. Add patterns with `--extra-ignore`.
+1. Find track
 
-Limitations: cannot read plain Text content (why manual blocks exist). Ordering matters. Formatting beyond plain text not preserved.
+   ```bash
+   python src/textp2srt.py tracks
+   ```
+2. Harvest plain Text clips
 
-DaVinciResolveScript loading (macOS): the script first tries normal import, then looks in:
+   ```bash
+   python src/textp2srt.py watch manual.txt
+   ```
+
+   * For each **plain Text** clip:
+
+     * Select it, Cmd+A → Cmd+C (text copied)
+     * Watcher adds new `>` block
+   * Text+ clips are read automatically later.
+3. Preview & diagnose
+
+   ```bash
+   python src/textp2srt.py preview manual.txt V4 --include-text-plus
+   python src/textp2srt.py diagnose manual.txt V4 --include-text-plus
+   ```
+4. Export
+
+   ```bash
+   python src/textp2srt.py srt manual.txt subs.srt V4 --include-text-plus
+   ```
+
+---
+
+## Tips
+
+* First clipboard snapshot is ignored (often stale).
+* Wrong block? → just edit `manual.txt`.
+* Filtering: common transitions + very short text ignored by default.
+
+  * Disable with `--no-ignore-effects`.
+  * Add patterns with `--extra-ignore`.
+
+---
+
+## Resolve Scripting (macOS)
+
+The script tries normal import, then:
+
 ```
 /Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting/Modules/
 ```
-If import fails: ensure Resolve is running, check that path exists. Quick test:
-```
+
+Quick test:
+
+```bash
 python -c "import DaVinciResolveScript as d;print('ok')"
 ```
-If still failing, temporarily:
-```
+
+If failing:
+
+```bash
 export PYTHONPATH="$PYTHONPATH:/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting/Modules"
 ```
 
-Windows / Linux quick paths(maybe):
-```
-Windows (ProgramData): C:\ProgramData\Blackmagic Design\DaVinci Resolve\Support\Developer\Scripting\Modules
-Linux (default):       /opt/resolve/Developer/Scripting/Modules
-```
+Other OS paths:
 
-Find them if unsure:
-```
-# PowerShell (run as user)
+* Windows: `C:\ProgramData\Blackmagic Design\DaVinci Resolve\Support\Developer\Scripting\Modules`
+* Linux:   `/opt/resolve/Developer/Scripting/Modules`
+
+---
+
+## Debug helpers
+
+Find scripting modules:
+
+```powershell
+# Windows PowerShell
 gci -Recurse -Filter DaVinciResolveScript.py "C:/ProgramData/Blackmagic Design" 2>$null
+```
 
+```bash
 # Linux
 sudo find /opt/resolve -name DaVinciResolveScript.py 2>/dev/null
 ```
 
-Using fuscript to print sys.path (any OS):
-```
+Show Resolve’s Python sys.path:
+
+```bash
 "/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Libraries/Fusion/fuscript" -l python3 -c "import sys;print(*sys.path,sep='\n')"
 ```
-On Windows adjust path, e.g.:
-```
-"C:\Program Files\Blackmagic Design\DaVinci Resolve\fuscript.exe" -l python3 -c "import sys;print(*sys.path,sep='\n')"
-```
 
-Trouble hints:
-* Blocks > clips -> stray `>` or over filtering.
-* Clips > blocks -> merge or add blocks / add ignore patterns.
-* Missing Text+ lines -> forgot `--include-text-plus`.
+---
 
-License: see `LICENSE`.
-Credit: based on original TextPlus2SRT; simplified for mixed workflow.
+## Troubleshooting
 
+* More blocks than clips → stray `>` or over-filtering
+* More clips than blocks → merge / add blocks / update ignore patterns
+  * These issues can be resolved by simply exporting the current blocks, placing them on the timeline, and checking the differences.
+* Missing Text+ → forgot `--include-text-plus`
 
+---
+
+## License
+
+See `LICENSE`.
